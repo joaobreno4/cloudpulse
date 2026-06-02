@@ -9,6 +9,7 @@ volumes:
   neo4j_data:
   neo4j_logs:
   grafana_data:
+  loki_data:
 
 services:
   # 🗄️ BANCO DE DADOS RELACIONAL (MÉTRICAS + CORE)
@@ -122,5 +123,45 @@ services:
       - ./grafana/provisioning/alerting:/etc/grafana/provisioning/alerting:ro
     depends_on:
       - prometheus
+      - loki
+    networks:
+      - cloudpulse-net
+
+  # 📋 LOKI (AGREGAÇÃO DE LOGS)
+  loki:
+    image: grafana/loki:latest
+    container_name: cloudpulse-loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    networks:
+      - cloudpulse-net
+
+  # 🔍 PROMTAIL (COLETA DE LOGS DOS CONTAINERS)
+  promtail:
+    image: grafana/promtail:latest
+    container_name: cloudpulse-promtail
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - loki
+    networks:
+      - cloudpulse-net
+
+  # ☁️ LOCALSTACK (EMULAÇÃO DE SERVIÇOS AWS)
+  localstack:
+    image: localstack/localstack:latest
+    container_name: cloudpulse-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3,sqs
+      - DEBUG=0
+      - DEFAULT_REGION=us-east-1
     networks:
       - cloudpulse-net

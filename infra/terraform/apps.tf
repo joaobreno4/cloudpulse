@@ -36,6 +36,21 @@ resource "docker_image" "grafana_img" {
   keep_locally = true
 }
 
+resource "docker_image" "loki_img" {
+  name         = "grafana/loki:latest"
+  keep_locally = true
+}
+
+resource "docker_image" "promtail_img" {
+  name         = "grafana/promtail:latest"
+  keep_locally = true
+}
+
+resource "docker_image" "localstack_img" {
+  name         = "localstack/localstack:latest"
+  keep_locally = true
+}
+
 # ==========================================
 # CONTÊINERES: APLICAÇÕES (APIs)
 # ==========================================
@@ -58,7 +73,7 @@ resource "docker_container" "core_api" {
     "Neo4j__Username=neo4j",
     "Neo4j__Password=cloudpulse_password",
     "Neo4j__Uri=bolt://cloudpulse-neo4j-tf:7687",
-    
+
     # Variáveis do Datadog Agent (prontas para o futuro)
     "DD_AGENT_HOST=cloudpulse-datadog-agent-tf",
     "DD_SERVICE=cloudpulse-core-api",
@@ -141,5 +156,75 @@ resource "docker_container" "grafana" {
   env = [
     "GF_SECURITY_ADMIN_PASSWORD=admin",
     "GF_ALERTING_ENABLED=true"
+  ]
+}
+
+# ==========================================
+# CONTÊINERES: LOGS (Loki/Promtail)
+# ==========================================
+resource "docker_container" "loki" {
+  name    = "cloudpulse-loki-tf"
+  image   = docker_image.loki_img.image_id
+  command = ["-config.file=/etc/loki/local-config.yaml"]
+
+  networks_advanced {
+    name    = docker_network.cloudpulse_net.name
+    aliases = ["loki"]
+  }
+
+  ports {
+    internal = 3100
+    external = 3100
+  }
+
+  volumes {
+    host_path      = "${abspath(path.module)}/../loki-config.yml"
+    container_path = "/etc/loki/local-config.yaml"
+    read_only      = true
+  }
+}
+
+resource "docker_container" "promtail" {
+  name    = "cloudpulse-promtail-tf"
+  image   = docker_image.promtail_img.image_id
+  command = ["-config.file=/etc/promtail/config.yml"]
+
+  networks_advanced {
+    name = docker_network.cloudpulse_net.name
+  }
+
+  volumes {
+    host_path      = "${abspath(path.module)}/../promtail-config.yml"
+    container_path = "/etc/promtail/config.yml"
+    read_only      = true
+  }
+
+  volumes {
+    host_path      = "/var/run/docker.sock"
+    container_path = "/var/run/docker.sock"
+    read_only      = true
+  }
+}
+
+# ==========================================
+# CONTÊINER: CLOUD LOCAL (LocalStack)
+# ==========================================
+resource "docker_container" "localstack" {
+  name  = "cloudpulse-localstack-tf"
+  image = docker_image.localstack_img.image_id
+
+  networks_advanced {
+    name = docker_network.cloudpulse_net.name
+  }
+
+  ports {
+    internal = 4566
+    external = 4566
+  }
+
+  env = [
+    "SERVICES=s3,sqs",
+    "DEBUG=0",
+    "DEFAULT_REGION=us-east-1"
   ]
 }
