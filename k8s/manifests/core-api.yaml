@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
         - name: core-api
-          image: cloudpulse-backend-core:latest
-          imagePullPolicy: Never
+          image: cloudpulse-core-api:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5223
           env:
