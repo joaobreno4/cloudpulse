@@ -91,3 +91,18 @@ services:
         condition: service_started
     networks:
       - cloudpulse-net
+
+  # 📊 GRAFANA (DASHBOARDS + ALERTING)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: cloudpulse-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_ALERTING_ENABLED=true
+    volumes:
+      - ./terraform/monitoring/grafana-datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml:ro
+      - ./grafana/provisioning/alerting:/etc/grafana/provisioning/alerting:ro
+    networks:
+      - cloudpulse-net

@@ -132,7 +132,14 @@ resource "docker_container" "grafana" {
     read_only      = true
   }
 
+  volumes {
+    host_path      = "${path.module}/../grafana/provisioning/alerting"
+    container_path = "/etc/grafana/provisioning/alerting"
+    read_only      = true
+  }
+
   env = [
-    "GF_SECURITY_ADMIN_PASSWORD=admin"
+    "GF_SECURITY_ADMIN_PASSWORD=admin",
+    "GF_ALERTING_ENABLED=true"
   ]
 }

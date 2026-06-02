@@ -1,6 +1,7 @@
 apiVersion: 1
 datasources:
   - name: Prometheus
+    uid: cloudpulse-prometheus
     type: prometheus
     access: proxy
     url: http://cloudpulse-prometheus-tf:9090

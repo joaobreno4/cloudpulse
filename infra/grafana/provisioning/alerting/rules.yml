@@ -1,0 +1,57 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: CloudPulse Infrastructure
+    folder: CloudPulse
+    interval: 1m
+    rules:
+      - uid: cloudpulse-service-down
+        title: Service Down
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: cloudpulse-prometheus
+            model:
+              expr: up{job="cloudpulse-core-api"} == 0
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+        noDataState: Alerting
+        execErrState: Error
+        for: 1m
+        annotations:
+          summary: "Serviço {{ $labels.job }} está fora do ar"
+          description: "O serviço {{ $labels.job }} está inacessível há mais de 1 minuto. Verifique o estado do container."
+        labels:
+          severity: critical
+          team: platform
+
+      - uid: cloudpulse-high-memory
+        title: High Memory Usage
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: cloudpulse-prometheus
+            model:
+              expr: process_resident_memory_bytes{job="cloudpulse-core-api"} > 524288000
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "Uso de memória elevado em {{ $labels.job }}"
+          description: "O processo {{ $labels.job }} está consumindo mais de 500MB de RAM há mais de 5 minutos."
+        labels:
+          severity: warning
+          team: platform
