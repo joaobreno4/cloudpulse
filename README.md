@@ -3,13 +3,17 @@
 ![CI](https://github.com/joaobreno4/cloudpulse/actions/workflows/ci.yml/badge.svg)
 ![Terraform](https://img.shields.io/badge/IaC-Terraform-7B42BC?logo=terraform&logoColor=white)
 ![Docker](https://img.shields.io/badge/Containers-Docker-2496ED?logo=docker&logoColor=white)
+![Kubernetes](https://img.shields.io/badge/Orchestration-Kubernetes-326CE5?logo=kubernetes&logoColor=white)
+![ArgoCD](https://img.shields.io/badge/GitOps-ArgoCD-EF7B4D?logo=argo&logoColor=white)
 ![.NET](https://img.shields.io/badge/Backend-.NET_8-512BD4?logo=dotnet&logoColor=white)
 ![Python](https://img.shields.io/badge/Backend-Python_FastAPI-009688?logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/Frontend-React_19-61DAFB?logo=react&logoColor=black)
 ![Grafana](https://img.shields.io/badge/Observability-Grafana-F46800?logo=grafana&logoColor=white)
+![Loki](https://img.shields.io/badge/Logs-Loki-F5A800?logo=grafana&logoColor=white)
 ![Datadog](https://img.shields.io/badge/Monitoring-Datadog-632CA6?logo=datadog&logoColor=white)
+![LocalStack](https://img.shields.io/badge/Cloud_Local-LocalStack-E74C3C?logo=amazon-aws&logoColor=white)
 
-Plataforma de **observabilidade e mapeamento topológico** para ecossistemas de microsserviços. O CloudPulse descobre, mapeia e monitora dependências entre serviços em tempo real, entregando visibilidade completa da arquitetura, métricas de latência e alertas proativos.
+Plataforma de **observabilidade e mapeamento topológico** para ecossistemas de microsserviços. O CloudPulse descobre, mapeia e monitora dependências entre serviços em tempo real, entregando visibilidade completa da arquitetura, métricas de latência, logs centralizados e alertas proativos.
 
 ---
 
@@ -19,6 +23,8 @@ Plataforma de **observabilidade e mapeamento topológico** para ecossistemas de 
 - [Stack Tecnológico](#stack-tecnológico)
 - [Infraestrutura como Código (IaC)](#infraestrutura-como-código-iac)
 - [Observabilidade e Monitoramento](#observabilidade-e-monitoramento)
+- [GitOps com Kubernetes e ArgoCD](#gitops-com-kubernetes-e-argocd)
+- [Emulação de Cloud com LocalStack](#emulação-de-cloud-com-localstack)
 - [Pipeline DevSecOps (CI/CD)](#pipeline-devsecops-cicd)
 - [Como Executar](#como-executar)
 
@@ -29,26 +35,40 @@ Plataforma de **observabilidade e mapeamento topológico** para ecossistemas de 
 O CloudPulse é construído sobre uma arquitetura de **microsserviços desacoplados**, onde cada componente possui responsabilidade única e ciclo de vida independente:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        CloudPulse Platform                      │
-│                                                                 │
-│  ┌─────────────┐     ┌──────────────┐     ┌─────────────────┐  │
-│  │  Frontend   │────▶│  Core API    │────▶│   PostgreSQL    │  │
-│  │  React 19   │     │  .NET 8 / C# │     │  (Métricas/Core)│  │
-│  │  Vite + RFW │     │  Port: 5223  │────▶│   Neo4j         │  │
-│  │  Port: 5173 │     └──────────────┘     │  (Topologia)    │  │
-│  └─────────────┘                          └─────────────────┘  │
-│                       ┌──────────────┐                         │
-│                       │ Metrics API  │                         │
-│                       │ Python/FastAPI│                        │
-│                       │ Port: 8001   │                         │
-│                       └──────────────┘                         │
-│                                                                 │
-│  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐   │
-│  │  Prometheus  │────▶│   Grafana    │     │   Datadog    │   │
-│  │  Port: 9090  │     │  Port: 3000  │     │    Agent     │   │
-│  └──────────────┘     └──────────────┘     └──────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│                          CloudPulse Platform                             │
+│                                                                          │
+│  ┌─────────────┐     ┌──────────────┐     ┌──────────────────────────┐  │
+│  │  Frontend   │────▶│  Core API    │────▶│  PostgreSQL (Core/Dados) │  │
+│  │  React 19   │     │  .NET 8 / C# │     └──────────────────────────┘  │
+│  │  Vite + RFW │     │  Port: 5223  │────▶┌──────────────────────────┐  │
+│  │  Port: 5173 │     └──────────────┘     │  Neo4j (Topologia)       │  │
+│  └─────────────┘     ┌──────────────┐     └──────────────────────────┘  │
+│                       │ Metrics API  │                                   │
+│                       │ Python/FastAPI│                                  │
+│                       │ Port: 8001   │                                   │
+│                       └──────────────┘                                   │
+│                                                                          │
+│  ── OBSERVABILIDADE ──────────────────────────────────────────────────  │
+│  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐             │
+│  │  Prometheus  │────▶│              │     │   Datadog    │             │
+│  │  Port: 9090  │     │   Grafana    │     │    Agent     │             │
+│  ├──────────────┤     │  Port: 3000  │     └──────────────┘             │
+│  │     Loki     │────▶│              │                                   │
+│  │  Port: 3100  │     └──────────────┘                                   │
+│  └──────────────┘           ▲                                            │
+│  ┌──────────────┐           │                                            │
+│  │   Promtail   │───logs────┘                                            │
+│  │  (Docker SD) │                                                        │
+│  └──────────────┘                                                        │
+│                                                                          │
+│  ── INFRA LOCAL ──────────────────────────────────────────────────────  │
+│  ┌──────────────────────────┐   ┌─────────────────────────────────────┐ │
+│  │  LocalStack (Port: 4566) │   │  Kubernetes + ArgoCD (GitOps)       │ │
+│  │  S3: cloudpulse-assets   │   │  k8s/manifests/ ──sync──▶ Minikube  │ │
+│  │  SQS: cloudpulse-events  │   └─────────────────────────────────────┘ │
+│  └──────────────────────────┘                                            │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
 | Camada | Serviço | Responsabilidade |
@@ -58,6 +78,10 @@ O CloudPulse é construído sobre uma arquitetura de **microsserviços desacopla
 | **API Metrics** | Python FastAPI | Coleta e processamento de métricas de performance |
 | **Graph DB** | Neo4j 5.12 | Armazenamento e consulta da topologia de dependências |
 | **Relational DB** | PostgreSQL 15 | Persistência de métricas e dados de configuração |
+| **Métricas** | Prometheus + Grafana | Coleta, visualização e alertas de métricas |
+| **Logs** | Loki + Promtail | Agregação e consulta de logs centralizados |
+| **GitOps** | Kubernetes + ArgoCD | Deployment declarativo e sincronização automática |
+| **Cloud Local** | LocalStack | Emulação de S3 e SQS da AWS para desenvolvimento |
 
 ---
 
@@ -66,11 +90,13 @@ O CloudPulse é construído sobre uma arquitetura de **microsserviços desacopla
 | Categoria | Tecnologia |
 |---|---|
 | Frontend | React 19, Vite, XY Flow (React Flow), Recharts, React Router v7, Axios |
-| Backend Core | .NET 8, C#, Minimal APIs, EF Core, Npgsql, Neo4j.Driver, prometheus-net |
+| Backend Core | .NET 8, C#, Minimal APIs, EF Core, Npgsql, Neo4j.Driver, prometheus-net, Datadog APM |
 | Backend Metrics | Python, FastAPI |
 | Bancos de Dados | PostgreSQL 15, Neo4j 5.12 Community |
 | Infraestrutura | Terraform, Docker, Docker Compose |
-| Observabilidade | Prometheus, Grafana, Datadog |
+| Orquestração | Kubernetes, ArgoCD |
+| Observabilidade | Prometheus, Grafana, Loki, Promtail, Datadog |
+| Cloud Local | LocalStack (S3, SQS) |
 | CI/CD & Segurança | GitHub Actions, tfsec, Trivy, CodeQL |
 
 ---
@@ -86,21 +112,23 @@ O diretório `infra/terraform/` utiliza o provider `kreuzwerker/docker` para pro
 ```
 infra/terraform/
 ├── main.tf          # Provider Docker e configurações globais
-├── apps.tf          # Containers das APIs, Prometheus e Grafana
+├── apps.tf          # Containers das APIs, Prometheus, Grafana, Loki, Promtail e LocalStack
 ├── databases.tf     # Containers do PostgreSQL e Neo4j
 ├── network.tf       # Rede bridge cloudpulse-net
 ├── volumes.tf       # Volumes persistentes
 ├── variables.tf     # Variáveis parametrizadas (senhas, ambiente)
-└── monitoring/
-    ├── prometheus.yml          # Configuração de scrape do Prometheus
-    └── grafana-datasource.yml  # Datasource provisionado via código
+├── monitoring/
+│   ├── prometheus.yml          # Configuração de scrape do Prometheus
+│   └── grafana-datasource.yml  # Datasources Prometheus e Loki provisionados via código
+└── aws_local/
+    └── main.tf      # Provider AWS apontando para LocalStack (S3 + SQS)
 ```
 
 O Terraform também é responsável por **provisionar automaticamente o build** da imagem Docker da Core API antes de criar o container, garantindo que a imagem esteja sempre atualizada com o código mais recente.
 
 ### Docker Compose — Orquestração Local
 
-O `infra/docker-compose.yml` oferece uma alternativa mais ágil para desenvolvimento local, orquestrando todos os 6 serviços da plataforma em uma única rede bridge:
+O `infra/docker-compose.yml` orquestra todos os **10 serviços** da plataforma em uma única rede bridge, incluindo o stack completo de observabilidade e o LocalStack:
 
 ```bash
 docker compose -f infra/docker-compose.yml up -d
@@ -112,7 +140,7 @@ docker compose -f infra/docker-compose.yml up -d
 
 O CloudPulse adota uma cultura **"Observability as Code"**: nenhuma configuração de monitoramento existe fora do repositório.
 
-### Stack Local: Prometheus + Grafana
+### Métricas: Prometheus + Grafana
 
 ```
 prometheus (9090) ──scrape──▶ cloudpulse-core-api (:5223/metrics)
@@ -120,8 +148,8 @@ prometheus (9090) ──scrape──▶ cloudpulse-core-api (:5223/metrics)
                       │
                       ▼
                grafana (3000)
-               └── datasource.yml   (provisionado via arquivo)
-               └── alerting/        (Alerting as Code)
+               ├── datasources/datasource.yml  (Prometheus + Loki via arquivo)
+               └── alerting/
                    ├── alerting.yml  → contact points + políticas
                    └── rules.yml     → regras de alerta
 ```
@@ -135,14 +163,100 @@ As regras de alerta do Grafana são **versionadas no repositório** e provisiona
 | **Service Down** | `up{job="cloudpulse-core-api"} == 0` | `critical` | 1 min |
 | **High Memory Usage** | `process_resident_memory_bytes > 500MB` | `warning` | 5 min |
 
-O mapeamento de volume `./grafana/provisioning/alerting:/etc/grafana/provisioning/alerting:ro` garante que o Grafana carregue as regras na inicialização, tanto via Docker Compose quanto via Terraform.
+### Logs: Loki + Promtail
+
+```
+containers Docker
+     │  (stdout/stderr)
+     ▼
+promtail ──docker_sd_configs──▶ descobre containers automaticamente
+     │         via /var/run/docker.sock
+     │  (push)
+     ▼
+  loki (3100) ──▶ grafana (datasource: cloudpulse-loki)
+```
+
+O Promtail usa **Docker Service Discovery** (`docker_sd_configs`) para detectar e coletar logs de todos os containers da rede automaticamente, sem configuração manual por serviço. Cada log é enriquecido com os labels `container`, `service` e `logstream`.
+
+O container Loki no Terraform recebe o **network alias `loki`**, garantindo que o mesmo `promtail-config.yml` funcione tanto no Docker Compose (pelo service name) quanto no Terraform (pelo alias de rede).
 
 ### Datadog — Monitoramento Avançado
 
-Além da stack local, o CloudPulse possui integração com o **Datadog** para monitoramento de produção com visibilidade estendida:
+Além da stack local, o CloudPulse possui integração com o **Datadog** para monitoramento de produção:
 
-- **Dashboards automatizados** e **alertas de métricas** provisionados via Terraform, seguindo o mesmo princípio de IaC aplicado ao restante da infraestrutura.
-- O Datadog Agent roda como container na rede `cloudpulse-net`, e a Core API já está instrumentada com as variáveis de rastreamento (`DD_SERVICE`, `DD_ENV`, `DD_VERSION`), prontas para APM e distributed tracing.
+- **Dashboards automatizados** e **alertas de métricas** provisionados via Terraform.
+- A Core API tem instrumentação completa de **APM** via Datadog .NET Tracer (CLR Profiler), habilitado diretamente no Dockerfile com `CORECLR_ENABLE_PROFILING=1`.
+- Variáveis `DD_SERVICE`, `DD_ENV` e `DD_VERSION` injetadas via Terraform para rastreamento distribuído.
+
+---
+
+## GitOps com Kubernetes e ArgoCD
+
+A trilha GitOps permite o deployment declarativo da plataforma em um cluster Kubernetes (Minikube local), com sincronização automática via ArgoCD.
+
+### Estrutura dos Manifestos
+
+```
+k8s/
+├── manifests/
+│   ├── namespace.yaml   # Namespace cloudpulse
+│   ├── postgres.yaml    # Deployment + PVC (1Gi) + Service
+│   ├── core-api.yaml    # Deployment + Service (ClusterIP :5223)
+│   └── frontend.yaml    # Deployment + Service (NodePort :30080)
+└── argocd/
+    └── application.yaml # Recurso Application do ArgoCD
+```
+
+### ArgoCD — Sincronização Automática
+
+O arquivo `k8s/argocd/application.yaml` define um recurso `Application` que aponta para o diretório `k8s/manifests/` deste repositório. A cada push na branch `main`, o ArgoCD detecta a divergência e reconcilia o estado do cluster automaticamente:
+
+```yaml
+syncPolicy:
+  automated:
+    prune: true      # remove recursos deletados do repo
+    selfHeal: true   # reverte mudanças manuais no cluster
+  syncOptions:
+    - CreateNamespace=true
+```
+
+### Subindo com Minikube
+
+```bash
+# Instalar ArgoCD no cluster
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+# Aplicar o recurso Application
+kubectl apply -f k8s/argocd/application.yaml
+
+# Acompanhar a sincronização
+kubectl get applications -n argocd
+```
+
+---
+
+## Emulação de Cloud com LocalStack
+
+O **LocalStack** emula os serviços da AWS localmente na porta `4566`, permitindo desenvolver e testar integrações com S3 e SQS sem nenhum custo ou acesso à cloud real.
+
+### Recursos Provisionados
+
+O módulo `infra/terraform/aws_local/` usa o provider `hashicorp/aws` apontando todos os endpoints para `http://localhost:4566`:
+
+| Recurso | Tipo | Nome |
+|---|---|---|
+| Armazenamento de arquivos | S3 Bucket | `cloudpulse-assets` |
+| Fila de eventos assíncronos | SQS Queue | `cloudpulse-events` |
+
+### Provisionando os recursos AWS locais
+
+```bash
+# LocalStack deve estar rodando (via Docker Compose ou Terraform)
+cd infra/terraform/aws_local
+terraform init
+terraform apply -auto-approve
+```
 
 ---
 
@@ -179,12 +293,13 @@ push / pull_request → main
 ### Pré-requisitos
 
 - [Docker](https://docs.docker.com/get-docker/) e Docker Compose
-- [Terraform CLI](https://developer.hashicorp.com/terraform/install) (para o fluxo via IaC)
+- [Terraform CLI](https://developer.hashicorp.com/terraform/install) (para os fluxos via IaC)
+- [kubectl](https://kubernetes.io/docs/tasks/tools/) + [Minikube](https://minikube.sigs.k8s.io/docs/start/) (para o fluxo GitOps)
 - [Node.js 22+](https://nodejs.org/) (apenas para desenvolvimento local do frontend)
 
 ### Opção 1: Docker Compose (recomendado para desenvolvimento)
 
-Sobe todos os serviços — bancos de dados, APIs, Prometheus e Grafana — com um único comando:
+Sobe todos os 10 serviços — APIs, bancos de dados, Prometheus, Grafana, Loki, Promtail e LocalStack — com um único comando:
 
 ```bash
 docker compose -f infra/docker-compose.yml up -d
@@ -215,4 +330,6 @@ npm run dev
 | **Metrics API** | http://localhost:8001/docs | — |
 | **Grafana** | http://localhost:3000 | `admin` / `admin` |
 | **Prometheus** | http://localhost:9090 | — |
+| **Loki** | http://localhost:3100 | — |
+| **LocalStack** | http://localhost:4566 | — |
 | **Neo4j Browser** | http://localhost:7474 | `neo4j` / `cloudpulse_password` |
