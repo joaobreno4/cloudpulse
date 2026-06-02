@@ -1,0 +1,93 @@
+version: '3.8'
+
+networks:
+  cloudpulse-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  neo4j_data:
+  neo4j_logs:
+
+services:
+  # 🗄️ BANCO DE DADOS RELACIONAL (MÉTRICAS + CORE)
+  postgres-db:
+    image: postgres:15-alpine
+    container_name: cloudpulse-postgres
+    environment:
+      POSTGRES_DB: cloudpulse_db
+      POSTGRES_USER: cloudpulse_user
+      POSTGRES_PASSWORD: cloudpulse_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - cloudpulse-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cloudpulse_user -d cloudpulse_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 🕸️ BANCO DE GRAFOS (TOPOLOGIA DE INFRAESTRUTURA)
+  neo4j-db:
+    image: neo4j:5.12.0-community
+    container_name: cloudpulse-neo4j
+    environment:
+      NEO4J_AUTH: neo4j/cloudpulse_password
+    ports:
+      - "7474:7474" # Painel Browser
+      - "7687:7687" # Conexão Bolt (C#)
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    networks:
+      - cloudpulse-net
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "cloudpulse_password", "RETURN 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 🏢 BACK-END CORE (.NET 8)
+  backend-core:
+    build:
+      context: ../backend/backend-core/CloudPulse.CoreAPI
+      dockerfile: Dockerfile
+    container_name: cloudpulse-core-api
+    ports:
+      - "5223:5223"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__DefaultConnection=Host=postgres-db;Port=5432;Database=cloudpulse_db;Username=cloudpulse_user;Password=cloudpulse_password
+      - Neo4j__Uri=bolt://neo4j-db:7687
+      - Neo4j__Username=neo4j
+      - Neo4j__Password=cloudpulse_password
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      neo4j-db:
+        condition: service_healthy
+    networks:
+      - cloudpulse-net
+
+  # 📊 BACK-END METRICS (PYTHON FASTAPI)
+  backend-metrics:
+    build:
+      context: ../backend/backend-metrics
+      dockerfile: Dockerfile
+    container_name: cloudpulse-metrics-api
+    ports:
+      - "8001:8001"
+    environment:
+      # Repare que agora apontamos para os nomes dos containers dentro da rede do Docker!
+      - DB_DSN=host=postgres-db port=5432 dbname=cloudpulse_db user=cloudpulse_user password=cloudpulse_password
+      - CORE_API_URL=http://backend-core:5223/api/Services
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      backend-core:
+        condition: service_started
+    networks:
+      - cloudpulse-net

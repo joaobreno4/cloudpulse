@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: cloudpulse-postgres
+    environment:
+      POSTGRES_USER: cloudpulse_user
+      POSTGRES_PASSWORD: cloudpulse_password
+      POSTGRES_DB: cloudpulse_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - cloudpulse-network
+    restart: unless-stopped
+
+  neo4j:
+    image: neo4j:5.12-community
+    container_name: cloudpulse-neo4j
+    ports:
+      - "7474:7474" # Interface Web do Neo4j Browser
+      - "7687:7687" # Protocolo Bolt para conexão das APIs
+    environment:
+      - NEO4J_AUTH=neo4j/cloudpulse_password
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    networks:
+      - cloudpulse-network
+    restart: unless-stopped
+
+networks:
+  cloudpulse-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  neo4j_data:
+  neo4j_logs:

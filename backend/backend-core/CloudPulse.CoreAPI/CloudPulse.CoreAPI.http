@@ -1,0 +1,6 @@
+@CloudPulse.CoreAPI_HostAddress = http://localhost:5223
+
+GET {{CloudPulse.CoreAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
