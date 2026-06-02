@@ -1,12 +1,10 @@
-name: CI
+name: CloudPulse CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
   pull_request:
-    branches:
-      - main
+    branches: [ "main" ]
 
 jobs:
   terraform-validate:
@@ -17,60 +15,58 @@ jobs:
         working-directory: ./infra/terraform
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    - name: Checkout do código
+      uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
 
-      - name: Terraform Init
-        run: terraform init -backend=false
+    - name: Terraform Init
+      run: terraform init -backend=false
 
-      - name: Terraform Validate
-        run: terraform validate
+    - name: Terraform Validate
+      run: terraform validate
 
   backend-build:
-    name: Backend Build
+    name: .NET Core Build
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./backend/backend-core/CloudPulse.CoreAPI
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    - name: Checkout do código
+      uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.x'
+    - name: Setup .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
 
-      - name: Restore dependencies
-        run: dotnet restore
+    - name: Restaurar dependências
+      run: dotnet restore
 
-      - name: Build
-        run: dotnet build --no-restore --configuration Release
+    - name: Build do Projeto
+      run: dotnet build --no-restore --configuration Release
 
   frontend-build:
-    name: Frontend Build
+    name: Node.js Build
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./frontend
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    - name: Checkout do código
+      uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22.x
 
-      - name: Install dependencies
-        run: npm ci
+    - name: Instalar dependências
+      run: npm ci
 
-      - name: Build
-        run: npm run build
+    - name: Build do Projeto
+      run: npm run build
