@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'cloudpulse-core-api'
+    static_configs:
+      - targets: ['cloudpulse-core-api:5223']
+    metrics_path: /metrics
+
+  - job_name: 'cloudpulse-metrics-api'
+    static_configs:
+      - targets: ['cloudpulse-metrics-api:8001']
+    metrics_path: /metrics
