@@ -133,7 +133,7 @@ resource "docker_container" "grafana" {
   }
 
   volumes {
-    host_path      = "${path.module}/../grafana/provisioning/alerting"
+    host_path      = "${abspath(path.module)}/../grafana/provisioning/alerting"
     container_path = "/etc/grafana/provisioning/alerting"
     read_only      = true
   }
