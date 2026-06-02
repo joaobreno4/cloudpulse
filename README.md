@@ -313,7 +313,52 @@ terraform init
 terraform apply -auto-approve
 ```
 
-### Opção 3: Frontend em modo de desenvolvimento
+### Opção 3: GitOps com Kubernetes e ArgoCD
+
+> Requer Minikube rodando localmente: `minikube start`
+
+**Passo 1 — Instalar o ArgoCD no cluster:**
+
+```bash
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+```
+
+**Passo 2 — Aguardar os pods do ArgoCD ficarem prontos:**
+
+```bash
+kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=120s
+```
+
+**Passo 3 — Expor a UI do ArgoCD localmente:**
+
+```bash
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+```
+
+**Passo 4 — Obter a senha inicial do admin:**
+
+```bash
+kubectl get secret argocd-initial-admin-secret -n argocd \
+  -o jsonpath="{.data.password}" | base64 -d && echo
+```
+
+**Passo 5 — Registrar o Application do CloudPulse:**
+
+```bash
+kubectl apply -f k8s/argocd/application.yaml
+```
+
+A partir daqui, o ArgoCD monitora o diretório `k8s/manifests/` e sincroniza automaticamente a cada push na branch `main`. Acesse a UI em **https://localhost:8080** com `admin` e a senha obtida no passo 4.
+
+**Verificar o status da sincronização:**
+
+```bash
+kubectl get applications -n argocd
+kubectl get pods -n cloudpulse
+```
+
+### Opção 4: Frontend em modo de desenvolvimento
 
 ```bash
 cd frontend
