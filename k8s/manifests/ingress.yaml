@@ -1,6 +1,3 @@
-# Service ExternalName: ponte cross-namespace para o Grafana em monitoring.
-# O Ingress spec só aceita backends no mesmo namespace; este Service resolve isso
-# redirecionando chamadas para kube-prometheus-stack-grafana.monitoring.svc.cluster.local.
 apiVersion: v1
 kind: Service
 metadata:
@@ -21,45 +18,41 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: argocd
   annotations:
-    # Habilita regex nos campos path para usar grupos de captura ($1, $2).
     nginx.ingress.kubernetes.io/use-regex: "true"
-
-    # /$2 preserva o path original para o frontend e strips o prefixo para /api e /grafana.
-    # Sem grupos de captura, rewrite-target: / quebraria todos os assets do frontend.
     nginx.ingress.kubernetes.io/rewrite-target: /$2
-
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    # Garante o encaminhamento correto mesmo para backends externos
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Host $host;
 spec:
   ingressClassName: nginx
   rules:
-    - host: cloudpulse.local
-      http:
-        paths:
-          # /api → cloudpulse-core-api:5223  (strip prefix: /api/users → /users)
-          - path: /api(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: cloudpulse-core-api
-                port:
-                  number: 5223
-
-          # /grafana → kube-prometheus-stack-grafana:80 via ExternalName  (strip prefix)
-          - path: /grafana(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: grafana-external
-                port:
-                  number: 80
-
-          # / → cloudpulse-frontend:80  (catch-all; deve ficar por último)
-          # /()(.*)  →  rewrite: /$2  →  o path completo é preservado intacto
-          - path: /()(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: cloudpulse-frontend
-                port:
-                  number: 80
+  - host: cloudpulse.local
+    http:
+      paths:
+      # Rota para o Backend API
+      - path: /api(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: cloudpulse-core-api
+            port:
+              number: 5223
+      # Rota para o Grafana (via Service ExternalName)
+      - path: /grafana(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: grafana-external
+            port:
+              number: 80
+      # Rota para o Frontend (Catch-all)
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: cloudpulse-frontend
+            port:
+              number: 80
