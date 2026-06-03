@@ -4,22 +4,23 @@ metadata:
   name: cloudpulse
   namespace: cloudpulse
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    # Esta anotação captura tudo o que vier depois de /api e joga para o backend
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
   ingressClassName: nginx
   rules:
   - host: cloudpulse.local
     http:
       paths:
-      # API .NET: Encaminha tudo que começa com /api para o serviço
-      - path: /api
-        pathType: Prefix
+      # O REGEX (/|$)(.*) captura o que vier depois de /api
+      - path: /api(/|$)(.*)
+        pathType: ImplementationSpecific
         backend:
           service:
             name: cloudpulse-core-api
             port:
               number: 5223
-      # Frontend: Tudo o que não for /api, vai para o frontend
       - path: /
         pathType: Prefix
         backend:
