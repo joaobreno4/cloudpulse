@@ -10,6 +10,8 @@
 ![React](https://img.shields.io/badge/Frontend-React_19-61DAFB?logo=react&logoColor=black)
 ![Grafana](https://img.shields.io/badge/Observability-Grafana-F46800?logo=grafana&logoColor=white)
 ![Loki](https://img.shields.io/badge/Logs-Loki-F5A800?logo=grafana&logoColor=white)
+![OpenTelemetry](https://img.shields.io/badge/Traces-OpenTelemetry-425CC7?logo=opentelemetry&logoColor=white)
+![Jaeger](https://img.shields.io/badge/Tracing-Jaeger-66CFE2?logo=jaeger&logoColor=white)
 ![Datadog](https://img.shields.io/badge/Monitoring-Datadog-632CA6?logo=datadog&logoColor=white)
 ![LocalStack](https://img.shields.io/badge/Cloud_Local-LocalStack-E74C3C?logo=amazon-aws&logoColor=white)
 
@@ -79,6 +81,8 @@ O CloudPulse é construído sobre uma arquitetura de **microsserviços desacopla
 | **Graph DB** | Neo4j 5.12 | Armazenamento e consulta da topologia de dependências |
 | **Relational DB** | PostgreSQL 15 | Persistência de métricas e dados de configuração |
 | **Métricas** | Prometheus + Grafana | Coleta, visualização e alertas de métricas |
+| **Alerting** | Alertmanager | Roteamento e notificação de alertas por namespace |
+| **Traces** | OpenTelemetry Collector + Jaeger | Tracing distribuído end-to-end via OTLP |
 | **Logs** | Loki + Promtail | Agregação e consulta de logs centralizados |
 | **GitOps** | Kubernetes + ArgoCD | Deployment declarativo e sincronização automática |
 | **Cloud Local** | LocalStack | Emulação de S3 e SQS da AWS para desenvolvimento |
@@ -95,7 +99,7 @@ O CloudPulse é construído sobre uma arquitetura de **microsserviços desacopla
 | Bancos de Dados | PostgreSQL 15, Neo4j 5.12 Community |
 | Infraestrutura | Terraform, Docker, Docker Compose |
 | Orquestração | Kubernetes, ArgoCD |
-| Observabilidade | Prometheus, Grafana, Loki, Promtail, Datadog |
+| Observabilidade | Prometheus, Grafana, Alertmanager, OpenTelemetry Collector, Jaeger, Loki, Promtail, Datadog |
 | Cloud Local | LocalStack (S3, SQS) |
 | CI/CD & Segurança | GitHub Actions, tfsec, Trivy, CodeQL |
 
@@ -144,7 +148,7 @@ O CloudPulse adota uma cultura **"Observability as Code"**: nenhuma configuraç�
 
 ```
 prometheus (9090) ──scrape──▶ cloudpulse-core-api (:5223/metrics)
-                  ──scrape──▶ cloudpulse-metrics-api (:8001/metrics)
+                  ──scrape──▶ otel-collector (:8889/metrics)  ← via ServiceMonitor
                       │
                       ▼
                grafana (3000)
@@ -154,14 +158,29 @@ prometheus (9090) ──scrape──▶ cloudpulse-core-api (:5223/metrics)
                    └── rules.yml     → regras de alerta
 ```
 
-#### Alerting as Code
+#### Alerting as Code (Kubernetes)
 
-As regras de alerta do Grafana são **versionadas no repositório** e provisionadas automaticamente ao subir o container, sem nenhuma configuração manual via UI:
+As regras e roteamento de alertas são **CRDs versionados no repositório**, gerenciados pelo Prometheus Operator:
 
-| Alerta | Condição | Severidade | Janela |
-|---|---|---|---|
-| **Service Down** | `up{job="cloudpulse-core-api"} == 0` | `critical` | 1 min |
-| **High Memory Usage** | `process_resident_memory_bytes > 500MB` | `warning` | 5 min |
+| Recurso | Tipo | Descrição |
+|---|---|---|
+| `cpu-alert-rule.yaml` | `PrometheusRule` | `CloudpulseHighCPUUsage`: CPU > 80% da capacidade do cluster por > 1 min |
+| `alertmanager-config.yaml` | `AlertmanagerConfig` | Sub-rota `namespace=cloudpulse` → webhook logger |
+| `alertmanager-webhook-logger.yaml` | `Deployment` | Receiver de teste que imprime alertas JSON no stdout |
+
+### Traces: OpenTelemetry + Jaeger
+
+```
+cloudpulse-core-api (.NET 8)
+  └── OTLP/HTTP :4318 ──► otel-collector (monitoring ns)
+                               ├── metrics ──► prometheus exporter :8889
+                               ├── traces  ──► jaeger-collector :4317
+                               └── logs    ──► debug
+                                                │
+                                           jaeger UI :16686
+```
+
+A Core API exporta traces via `OpenTelemetry.Exporter.OpenTelemetryProtocol` com instrumentação automática de ASP.NET Core e HttpClient. O endpoint OTLP é configurável via variável de ambiente `OTEL_EXPORTER_OTLP_ENDPOINT`.
 
 ### Logs: Loki + Promtail
 
@@ -199,12 +218,19 @@ A trilha GitOps permite o deployment declarativo da plataforma em um cluster Kub
 ```
 k8s/
 ├── manifests/
-│   ├── namespace.yaml   # Namespace cloudpulse
-│   ├── postgres.yaml    # Deployment + PVC (1Gi) + Service
-│   ├── core-api.yaml    # Deployment + Service (ClusterIP :5223)
-│   └── frontend.yaml    # Deployment + Service (NodePort :30080)
+│   ├── namespace.yaml                  # Namespace cloudpulse
+│   ├── postgres.yaml                   # Deployment + PVC (1Gi) + Service
+│   ├── core-api.yaml                   # Deployment + Service (ClusterIP :5223)
+│   ├── frontend.yaml                   # Deployment + Service (NodePort :30080)
+│   ├── ingress.yaml                    # Ingress split: frontend (Blazor SPA) + backend
+│   ├── grafana-svc-manual.yaml         # Bridge Service/Endpoints → monitoring namespace
+│   ├── cpu-alert-rule.yaml             # PrometheusRule: CPU > 80% por 1 min
+│   ├── alertmanager-config.yaml        # AlertmanagerConfig: roteamento por namespace
+│   ├── alertmanager-webhook-logger.yaml# Receiver de teste (webhook echo)
+│   ├── otel-collector.yaml             # OTel Collector + ServiceMonitor
+│   └── jaeger.yaml                     # Jaeger all-in-one (OTLP + UI :16686)
 └── argocd/
-    └── application.yaml # Recurso Application do ArgoCD
+    └── application.yaml                # Recurso Application do ArgoCD
 ```
 
 ### ArgoCD — Sincronização Automática
@@ -370,11 +396,15 @@ npm run dev
 
 | Serviço | URL | Credenciais |
 |---|---|---|
+| Serviço | URL | Credenciais |
+|---|---|---|
 | **CloudPulse UI** | http://localhost:5173 | — |
 | **Core API (Swagger)** | http://localhost:5223/swagger | — |
 | **Metrics API** | http://localhost:8001/docs | — |
 | **Grafana** | http://localhost:3000 | `admin` / `admin` |
 | **Prometheus** | http://localhost:9090 | — |
+| **Alertmanager** | http://localhost:9093 | — |
+| **Jaeger UI** | `kubectl port-forward -n monitoring svc/jaeger-collector 16686:16686` | — |
 | **Loki** | http://localhost:3100 | — |
 | **LocalStack** | http://localhost:4566 | — |
 | **Neo4j Browser** | http://localhost:7474 | `neo4j` / `cloudpulse_password` |
