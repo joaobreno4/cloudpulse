@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ingress-nginx
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://kubernetes.github.io/ingress-nginx
+    chart: ingress-nginx
+    targetRevision: 4.10.1
+    helm:
+      values: |
+        controller:
+          # LoadBalancer + minikube tunnel = IP real na porta 80/443
+          service:
+            type: LoadBalancer
+
+          # Garante que apenas um pod rode no Minikube (nó único)
+          replicaCount: 1
+
+          # Recursos reduzidos para dev local
+          resources:
+            requests:
+              cpu: 50m
+              memory: 90Mi
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ingress-nginx
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,55 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: grafana
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: grafana
+    targetRevision: 8.5.2
+    helm:
+      values: |
+        adminUser: admin
+        adminPassword: cloudpulse
+
+        service:
+          type: NodePort
+          nodePort: 32300
+
+        datasources:
+          datasources.yaml:
+            apiVersion: 1
+            datasources:
+              - name: Loki
+                type: loki
+                uid: cloudpulse-loki
+                access: proxy
+                url: http://loki.monitoring.svc.cluster.local:3100
+                isDefault: true
+                editable: false
+              - name: Prometheus
+                type: prometheus
+                uid: cloudpulse-prometheus
+                access: proxy
+                url: http://prometheus-server.monitoring.svc.cluster.local:80
+                isDefault: false
+                editable: false
+
+        grafana.ini:
+          analytics:
+            check_for_updates: false
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
