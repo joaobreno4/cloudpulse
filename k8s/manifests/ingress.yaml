@@ -1,11 +1,33 @@
+# Service ExternalName: ponte cross-namespace para o Grafana em monitoring.
+# O Ingress spec só aceita backends no mesmo namespace; este Service resolve isso
+# redirecionando chamadas para kube-prometheus-stack-grafana.monitoring.svc.cluster.local.
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-external
+  namespace: cloudpulse
+spec:
+  type: ExternalName
+  externalName: kube-prometheus-stack-grafana.monitoring.svc.cluster.local
+  ports:
+    - port: 80
+      targetPort: 80
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: cloudpulse-frontend
+  name: cloudpulse
   namespace: cloudpulse
   labels:
     app.kubernetes.io/managed-by: argocd
   annotations:
+    # Habilita regex nos campos path para usar grupos de captura ($1, $2).
+    nginx.ingress.kubernetes.io/use-regex: "true"
+
+    # /$2 preserva o path original para o frontend e strips o prefixo para /api e /grafana.
+    # Sem grupos de captura, rewrite-target: / quebraria todos os assets do frontend.
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+
     nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
 spec:
@@ -14,8 +36,28 @@ spec:
     - host: cloudpulse.local
       http:
         paths:
-          - path: /
-            pathType: Prefix
+          # /api → cloudpulse-core-api:5223  (strip prefix: /api/users → /users)
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: cloudpulse-core-api
+                port:
+                  number: 5223
+
+          # /grafana → kube-prometheus-stack-grafana:80 via ExternalName  (strip prefix)
+          - path: /grafana(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: grafana-external
+                port:
+                  number: 80
+
+          # / → cloudpulse-frontend:80  (catch-all; deve ficar por último)
+          # /()(.*)  →  rewrite: /$2  →  o path completo é preservado intacto
+          - path: /()(.*)
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: cloudpulse-frontend

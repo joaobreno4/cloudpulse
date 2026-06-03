@@ -35,7 +35,8 @@ spec:
                 type: prometheus
                 uid: cloudpulse-prometheus
                 access: proxy
-                url: http://prometheus-server.monitoring.svc.cluster.local:80
+                # kube-prometheus-stack cria o service com o nome do release Helm (app name no ArgoCD)
+                url: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
                 isDefault: false
                 editable: false
 
