@@ -5,7 +5,7 @@ metadata:
   namespace: cloudpulse
 spec:
   type: ExternalName
-  externalName: kube-prometheus-stack-grafana.monitoring.svc.cluster.local
+  externalName: grafana.monitoring.svc.cluster.local
   ports:
     - port: 80
       targetPort: 80
