@@ -20,7 +20,7 @@ spec:
         - name: ghcr-secret
       containers:
         - name: frontend
-          image: ghcr.io/joaobreno4/cloudpulse-frontend:3ccd478
+          image: ghcr.io/joaobreno4/cloudpulse-frontend:4cc22c9
           imagePullPolicy: Always
           ports:
             - containerPort: 80
