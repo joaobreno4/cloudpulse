@@ -15,10 +15,23 @@ spec:
       labels:
         app: cloudpulse-core-api
     spec:
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:15-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h postgres-db -p 5432 -U cloudpulse_user; do
+                echo "[init] aguardando postgres-db..."
+                sleep 3
+              done
+              echo "[init] postgres-db pronto."
+
       containers:
         - name: core-api
-          image: cloudpulse-core-api:latest
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/joaobreno4/cloudpulse-core-api:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 5223
           env:
@@ -38,12 +51,22 @@ spec:
               value: production
             - name: DD_VERSION
               value: "1.0.0"
+          # /metrics é exposto pelo prometheus-net (app.UseMetricServer()) — endpoint garantido.
+          # /health não existe no Program.cs; usar /health retornaria 404 e o pod nunca ficaria Ready.
           readinessProbe:
             httpGet:
-              path: /health
+              path: /metrics
               port: 5223
-            initialDelaySeconds: 10
+            initialDelaySeconds: 30
             periodSeconds: 10
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 5223
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 3
 ---
 apiVersion: v1
 kind: Service
