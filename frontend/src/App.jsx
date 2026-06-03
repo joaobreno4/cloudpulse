@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, useParams } from 'react-router-dom';
 import axios from 'axios';
-import { Activity, Server, ArrowLeft, Plus, X, Network } from 'lucide-react';
+import { Activity, Server, ArrowLeft, Plus, X, Network, ClipboardList } from 'lucide-react';
+import TaskDashboard from './components/TaskDashboard';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 // --- IMPORTAÇÕES DO REACT FLOW (NOVO) ---
@@ -260,6 +261,9 @@ function App() {
             <Link to="/topology" style={{ color: '#ccc', textDecoration: 'none', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Network size={18} /> Topologia
             </Link>
+            <Link to="/tasks" style={{ color: '#ccc', textDecoration: 'none', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ClipboardList size={18} /> Tarefas
+            </Link>
           </nav>
         </header>
 
@@ -268,6 +272,7 @@ function App() {
             <Route path="/" element={<ServiceList />} />
             <Route path="/service/:id" element={<ServiceDashboard />} />
             <Route path="/topology" element={<TopologyMap />} />
+            <Route path="/tasks" element={<TaskDashboard />} />
           </Routes>
         </main>
       </div>

@@ -66,6 +66,7 @@ builder.Services.AddOpenTelemetry()
             opts.Filter = ctx => ctx.Request.Path != "/metrics";
         })
         .AddHttpClientInstrumentation()
+        .AddSource("CloudPulse.CoreAPI.Tasks")
         .AddOtlpExporter(opt =>
         {
             opt.Endpoint = new Uri(otlpEndpoint);
