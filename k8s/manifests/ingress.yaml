@@ -1,38 +1,40 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: grafana-external
+  name: grafana-service-bridge
   namespace: cloudpulse
 spec:
-  type: ExternalName
-  externalName: kube-prometheus-stack-grafana.monitoring.svc.cluster.local
   ports:
     - port: 80
-      targetPort: 80
+      targetPort: 3000 # Porta padrão do Grafana
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: grafana-service-bridge
+  namespace: cloudpulse
+subsets:
+  - addresses:
+      # Use o IP do cluster ou o nome DNS interno do service original do grafana
+      - ip: 192.168.49.2 # Verifique o IP do seu Minikube com `minikube ip`
+    ports:
+      - port: 3000
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: cloudpulse
   namespace: cloudpulse
-  labels:
-    app.kubernetes.io/managed-by: argocd
   annotations:
     nginx.ingress.kubernetes.io/use-regex: "true"
     nginx.ingress.kubernetes.io/rewrite-target: /$2
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
-    # Garante o encaminhamento correto mesmo para backends externos
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      proxy_set_header Host $host;
 spec:
   ingressClassName: nginx
   rules:
   - host: cloudpulse.local
     http:
       paths:
-      # Rota para o Backend API
       - path: /api(/|$)(.*)
         pathType: ImplementationSpecific
         backend:
@@ -40,15 +42,13 @@ spec:
             name: cloudpulse-core-api
             port:
               number: 5223
-      # Rota para o Grafana (via Service ExternalName)
       - path: /grafana(/|$)(.*)
         pathType: ImplementationSpecific
         backend:
           service:
-            name: grafana-external
+            name: grafana-service-bridge
             port:
               number: 80
-      # Rota para o Frontend (Catch-all)
       - path: /
         pathType: Prefix
         backend:
