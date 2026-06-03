@@ -30,7 +30,7 @@ spec:
 
       containers:
         - name: core-api
-          image: ghcr.io/joaobreno4/cloudpulse-core-api:4cc22c9
+          image: ghcr.io/joaobreno4/cloudpulse-core-api:9aecae1
           imagePullPolicy: Always
           ports:
             - containerPort: 5223
