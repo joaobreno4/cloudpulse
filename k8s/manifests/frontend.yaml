@@ -15,6 +15,9 @@ spec:
       labels:
         app: cloudpulse-frontend
     spec:
+      # O segredo criado para autorizar o pull da imagem no GHCR
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: frontend
           image: ghcr.io/joaobreno4/cloudpulse-frontend:latest
@@ -38,5 +41,5 @@ spec:
   ports:
     - port: 80
       targetPort: 80
-      nodePort: 30080
-  type: NodePort
+  # Usamos ClusterIP para roteamento interno via Ingress
+  type: ClusterIP
