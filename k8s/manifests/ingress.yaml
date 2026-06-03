@@ -1,3 +1,5 @@
+# Bridge cross-namespace para o Grafana (monitoring → cloudpulse).
+# Aponta para o NodePort 32300 no IP do Minikube — não para a porta interna do pod (3000).
 apiVersion: v1
 kind: Service
 metadata:
@@ -6,7 +8,7 @@ metadata:
 spec:
   ports:
     - port: 80
-      targetPort: 3000 # Porta padrão do Grafana
+      targetPort: 32300
 ---
 apiVersion: v1
 kind: Endpoints
@@ -15,10 +17,9 @@ metadata:
   namespace: cloudpulse
 subsets:
   - addresses:
-      # Use o IP do cluster ou o nome DNS interno do service original do grafana
-      - ip: 192.168.49.2 # Verifique o IP do seu Minikube com `minikube ip`
+      - ip: 192.168.49.2   # IP do nó Minikube — confirme com: minikube ip
     ports:
-      - port: 3000
+      - port: 32300         # NodePort do service grafana em monitoring (não a porta do pod)
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -26,33 +27,39 @@ metadata:
   name: cloudpulse
   namespace: cloudpulse
   annotations:
-    nginx.ingress.kubernetes.io/use-regex: "true"
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    # SEM rewrite-target: o path é enviado ao backend intacto.
+    # A API .NET tem [Route("api/[controller]")] — ela espera /api/Services, não /Services.
+    # Qualquer rewrite que strip o prefixo /api causa 404 no .NET, não no Nginx.
 spec:
   ingressClassName: nginx
   rules:
-  - host: cloudpulse.local
-    http:
-      paths:
-      - path: /api(/|$)(.*)
-        pathType: ImplementationSpecific
-        backend:
-          service:
-            name: cloudpulse-core-api
-            port:
-              number: 5223
-      - path: /grafana(/|$)(.*)
-        pathType: ImplementationSpecific
-        backend:
-          service:
-            name: grafana-service-bridge
-            port:
-              number: 80
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: cloudpulse-frontend
-            port:
-              number: 80
+    - host: cloudpulse.local
+      http:
+        paths:
+          # Prefix mais longo vence: /api (4 chars) ganha sobre / (1 char) para /api/*
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: cloudpulse-core-api
+                port:
+                  number: 5223
+
+          # /grafana via bridge NodePort — Grafana recebe /grafana/... intacto
+          - path: /grafana
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana-service-bridge
+                port:
+                  number: 80
+
+          # Catch-all para o frontend — deve ficar por último
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cloudpulse-frontend
+                port:
+                  number: 80
