@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: cloudpulse-receiver
+  namespace: cloudpulse
+  labels:
+    release: kube-prometheus-stack
+spec:
+  route:
+    receiver: webhook-logger
+    groupBy: ["alertname", "pod", "container"]
+    groupWait: 10s
+    groupInterval: 1m
+    repeatInterval: 5m
+  receivers:
+    - name: webhook-logger
+      webhookConfigs:
+        - url: "http://alertmanager-webhook-logger.cloudpulse.svc.cluster.local:5001/"
+          sendResolved: true

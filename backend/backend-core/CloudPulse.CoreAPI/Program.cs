@@ -1,6 +1,9 @@
 using CloudPulse.CoreAPI.Data;
 using Microsoft.EntityFrameworkCore;
 using Neo4j.Driver;
+using OpenTelemetry.Exporter;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,6 +24,9 @@ var neo4jUsername = Environment.GetEnvironmentVariable("Neo4j__Username")
 var neo4jPassword = Environment.GetEnvironmentVariable("Neo4j__Password")
     ?? builder.Configuration["Neo4j:Password"] ?? "cloudpulse_password";
 
+var otlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")
+    ?? "http://otel-collector.monitoring.svc.cluster.local:4318";
+
 // =========================================================================
 // 🔌 CONFIGURAÇÃO DOS SERVIÇOS (CONTAINER DE INJEÇÃO DE DEPENDÊNCIA)
 // =========================================================================
@@ -37,6 +43,34 @@ builder.Services.AddSingleton<IDriver>(GraphDatabase.Driver(
     neo4jUri,
     AuthTokens.Basic(neo4jUsername, neo4jPassword)
 ));
+
+// =========================================================================
+// 🔭 OPENTELEMETRY — TRACING DISTRIBUÍDO
+// =========================================================================
+// Métricas Prometheus continuam via prometheus-net (/metrics na porta 5223).
+// OTel é responsável pelos traces (spans) enviados ao Collector via OTLP/HTTP.
+
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource
+        .AddService(
+            serviceName: "cloudpulse-core-api",
+            serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "1.0.0")
+        .AddAttributes(new Dictionary<string, object>
+        {
+            ["deployment.environment"] = builder.Environment.EnvironmentName.ToLowerInvariant()
+        }))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation(opts =>
+        {
+            opts.RecordException = true;
+            opts.Filter = ctx => ctx.Request.Path != "/metrics";
+        })
+        .AddHttpClientInstrumentation()
+        .AddOtlpExporter(opt =>
+        {
+            opt.Endpoint = new Uri(otlpEndpoint);
+            opt.Protocol = OtlpExportProtocol.HttpProtobuf;
+        }));
 
 builder.Services.AddCors(options =>
 {

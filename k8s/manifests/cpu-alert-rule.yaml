@@ -1,0 +1,31 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cloudpulse-cpu-alert
+  namespace: cloudpulse
+  labels:
+    app: kube-prometheus-stack
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: cloudpulse.cpu.rules
+      rules:
+        - alert: CloudpulseHighCPUUsage
+          expr: |
+            sum(rate(container_cpu_usage_seconds_total{
+              namespace="cloudpulse",
+              container!="",
+              image!=""
+            }[2m])) by (pod, container)
+            / scalar(sum(kube_node_status_allocatable{resource="cpu"}))
+            * 100 > 80
+          for: 1m
+          labels:
+            severity: warning
+            namespace: cloudpulse
+          annotations:
+            summary: "Alto uso de CPU no namespace cloudpulse"
+            description: >-
+              Container {{ $labels.container }} no pod {{ $labels.pod }}
+              está consumindo {{ $value | printf "%.1f" }}% da CPU alocável
+              do cluster por mais de 1 minuto.

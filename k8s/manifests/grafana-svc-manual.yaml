@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-prometheus-stack-grafana
+  namespace: cloudpulse
+spec:
+  ports:
+    - port: 80
+      targetPort: 80
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: kube-prometheus-stack-grafana
+  namespace: cloudpulse
+subsets:
+  - addresses:
+      - ip: 10.104.115.177
+    ports:
+      - port: 80

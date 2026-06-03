@@ -1,22 +1,44 @@
-apiVersion: v1
-kind: Service
+apiVersion: networking.k8s.io/v1
+kind: Ingress
 metadata:
-  name: grafana-service-bridge
+  name: cloudpulse-frontend
   namespace: cloudpulse
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      add_header X-Frame-Options "SAMEORIGIN" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header Strict-Transport-Security "max-age=31536000" always;
+      try_files $uri $uri/ /index.html;
 spec:
-  type: ExternalName
-  externalName: grafana.monitoring.svc.cluster.local
-  ports:
-    - port: 80
-      targetPort: 80
+  ingressClassName: nginx
+  rules:
+    - host: cloudpulse.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cloudpulse-frontend
+                port:
+                  number: 80
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: cloudpulse
+  name: cloudpulse-backend
   namespace: cloudpulse
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      add_header X-Frame-Options "SAMEORIGIN" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header Strict-Transport-Security "max-age=31536000" always;
 spec:
   ingressClassName: nginx
   rules:
@@ -30,19 +52,10 @@ spec:
                 name: cloudpulse-core-api
                 port:
                   number: 5223
-
           - path: /grafana
             pathType: Prefix
             backend:
               service:
-                name: grafana-service-bridge
-                port:
-                  number: 80
-
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: cloudpulse-frontend
+                name: kube-prometheus-stack-grafana
                 port:
                   number: 80

@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager-webhook-logger
+  namespace: cloudpulse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alertmanager-webhook-logger
+  template:
+    metadata:
+      labels:
+        app: alertmanager-webhook-logger
+    spec:
+      containers:
+        - name: webhook-logger
+          image: python:3.12-alpine
+          command: ["python3", "-u", "-c"]
+          args:
+            - |
+              from http.server import HTTPServer, BaseHTTPRequestHandler
+              import json
+
+              class Handler(BaseHTTPRequestHandler):
+                  def do_POST(self):
+                      length = int(self.headers.get("Content-Length", 0))
+                      body = self.rfile.read(length).decode()
+                      try:
+                          data = json.loads(body)
+                          print(json.dumps(data, indent=2), flush=True)
+                      except Exception:
+                          print(body, flush=True)
+                      self.send_response(200)
+                      self.end_headers()
+                  def log_message(self, *args):
+                      pass
+
+              print("Webhook logger listening on :5001", flush=True)
+              HTTPServer(("", 5001), Handler).serve_forever()
+          ports:
+            - containerPort: 5001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager-webhook-logger
+  namespace: cloudpulse
+spec:
+  selector:
+    app: alertmanager-webhook-logger
+  ports:
+    - port: 5001
+      targetPort: 5001
