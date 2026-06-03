@@ -40,3 +40,4 @@ backend/appsettings.Secret.json
 .idea/
 *.swp
 *.swo
+argocd-linux-amd64
